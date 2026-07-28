@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 肌膚檢測</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #fafafa; color: #333; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        video, canvas { width: 100%; border-radius: 8px; margin-top: 10px; display: none; }
+        button { background: #ff4d4f; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 16px; cursor: pointer; margin-top: 15px; width: 100%; }
+        button:hover { background: #ff7875; }
+        .result-box { display: none; margin-top: 20px; text-align: left; background: #f0f5ff; padding: 15px; border-radius: 8px; }
+        .product-link { display: none; background: #52c41a; color: white; text-align: center; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>AI 智慧肌膚檢測</h2>
+    <p>只需 3 秒，為您精準分析膚況並推薦專屬保養品</p>
+    
+    <!-- 鏡頭與拍照區域 -->
+    <button id="start-btn">開啟相機</button>
+    <video id="video" autoplay playsinline></video>
+    <button id="snap-btn" style="display:none;">捕捉當前膚況</button>
+    <canvas id="canvas"></canvas>
+
+    <!-- 檢測結果顯示 -->
+    <div id="loading" style="display:none; margin-top:15px; color:#1890ff;">AI 分析中，請稍候...</div>
+    
+    <div class="result-box" id="result-box">
+        <h3>您的檢測報告：</h3>
+        <p id="res-moisture">💧 肌膚保水度：--</p>
+        <p id="res-pore">🕳️ 毛孔細緻度：--</p>
+        <p id="res-oil">🧪 出油狀況：--</p>
+    </div>
+
+    <!-- 導購按鈕 -->
+    <a href="#" id="product-redirect" class="product-link" target="_blank">👉 查看推薦您的專屬保養品</a>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const startBtn = document.getElementById('start-btn');
+    const snapBtn = document.getElementById('snap-btn');
+    const loading = document.getElementById('loading');
+    const resultBox = document.getElementById('result-box');
+    const productLink = document.getElementById('product-redirect');
+
+    // 填入您的 Google Apps Script 部署網址
+    const GOOGLE_SCRIPT_URL = '請替換成您的_GOOGLE_SCRIPT_網址'; 
+    
+    // 填入您的 91APP 商品頁面網址
+    const MOISTURE_PRODUCT_URL = 'https://your91appshop.com'; // 保濕產品
+    const PORE_PRODUCT_URL = 'https://your91appshop.com'; // 毛孔緊緻產品
+
+    // 1. 開啟手機相機
+    startBtn.addEventListener('click', async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            snapBtn.style.display = 'block';
+            startBtn.style.display = 'none';
+        } catch (err) {
+            alert('無法開啟相機，請確認已授權瀏覽器相機權限。');
+        }
+    });
+
+    // 2. 拍照並呼叫 API 檢測
+    snapBtn.addEventListener('click', () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        
+        // 停止相機以省電
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        video.style.display = 'none';
+        snapBtn.style.display = 'none';
+
+        // 模擬呼叫 AI 肌膚辨識 API（此處以隨機數模擬，實務上需改為 fetch 呼叫玩美移動等 API）
+        loading.style.display = 'block';
+        
+        setTimeout(() => {
+            const skinData = {
+                moisture: Math.floor(Math.random() * 40) + 50, // 50-90
+                pore: Math.floor(Math.random() * 40) + 50,
+                oil: Math.floor(Math.random() * 40) + 50,
+                timestamp: new Date().toLocaleString()
+            };
+
+            loading.style.display = 'none';
+            showResults(skinData);
+        }, 2000);
+    });
+
+    // 3. 顯示結果、判定導流商品，並將資料寫回雲端 Excel
+    function showResults(data) {
+        resultBox.style.display = 'block';
+        document.getElementById('res-moisture').innerText = `💧 肌膚保水度：${data.moisture} 分`;
+        document.getElementById('res-pore').innerText = `🕳️ 毛孔細緻度：${data.pore} 分`;
+        document.getElementById('res-oil').innerText = `🧪 出油狀況：${data.oil} 分`;
+
+        // 導流邏輯：判斷哪個分數比較低，就推薦該產品
+        let targetUrl = '';
+        if (data.moisture < data.pore) {
+            productLink.innerText = '👉 您的肌膚偏乾，點此查看推薦保濕霜';
+            targetUrl = MOISTURE_PRODUCT_URL;
+        } else {
+            productLink.innerText = '👉 建議加強毛孔緊緻，點此查看推薦精華液';
+            targetUrl = PORE_PRODUCT_URL;
+        }
+        productLink.href = targetUrl;
+        productLink.style.display = 'block';
+
+        // 呼叫後台，將數據自動寫入雲端 Excel (Google Sheets)
+        saveToCloudExcel(data, targetUrl);
+    }
+
+    // 4. 將資料傳送到 Google 試算表
+    function saveToCloudExcel(data, recommendedProduct) {
+        // 利用 FormData 格式傳送
+        const formData = new URLSearchParams();
+        formData.append('timestamp', data.timestamp);
+        formData.append('moisture', data.moisture);
+        formData.append('pore', data.pore);
+        formData.append('oil', data.oil);
+        formData.append('recommend', recommendedProduct);
+
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+        .then(res => console.log('資料已成功寫入雲端 Excel'))
+        .catch(err => console.error('寫入失敗:', err));
+    }
+</script>
+</body>
+</html>
